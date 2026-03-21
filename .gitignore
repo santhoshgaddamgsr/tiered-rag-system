@@ -32,3 +32,6 @@ Thumbs.db
 
 # Notebooks
 .ipynb_checkpoints/
+
+# Environment variables
+.env
