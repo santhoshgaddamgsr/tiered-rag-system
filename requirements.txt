@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+langchain
+langgraph
+sentence-transformers
+faiss-cpu
+rank-bm25
+ragas
+streamlit
+pandas
+numpy
+scikit-learn
+pyyaml
+ollama
