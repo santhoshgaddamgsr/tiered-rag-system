@@ -1,0 +1,11 @@
+question,ground_truth
+"How does the transformer model use attention?","The transformer model uses self-attention mechanisms to compute relationships between tokens in a sequence without relying on recurrence or convolution."
+"How is self-attention computed in transformers?","Self-attention is computed using query, key, and value vectors where each token attends to other tokens and assigns weights based on their relevance."
+"What are large language models used for?","Large language models are neural networks trained on large text corpora to understand, generate, and perform tasks involving human language."
+"Why is positional encoding needed in transformers?","Positional encoding is used in transformers to provide information about token positions since the architecture does not use recurrence and processes tokens in parallel."
+"What is the role of attention in neural networks?","Attention mechanisms allow models to focus on the most relevant parts of the input sequence when making predictions or generating outputs."
+"What problem does self-attention solve?","Self-attention helps capture long-range dependencies in sequences by allowing tokens to directly attend to all other tokens in the sequence."
+"Why are transformers better than RNNs?","Transformers are more efficient than RNNs because they process sequences in parallel and use attention mechanisms instead of sequential computation."
+"What is the benefit of using attention mechanisms?","Attention improves model performance by enabling selective focus on important features or tokens in the input."
+"How do transformers process sequences?","Transformers process sequences using layers of self-attention and feed-forward networks without relying on sequential processing."
+"What is the purpose of query, key, and value in attention?","Query, key, and value vectors are used to compute attention scores that determine how much each token attends to others in the sequence."

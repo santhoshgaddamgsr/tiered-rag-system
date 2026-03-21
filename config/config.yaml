@@ -1,0 +1,11 @@
+retrieval:
+  vector_k: 30
+  bm25_k: 10
+
+reranker:
+  threshold_multiplier: 0.7
+  min_score: 0.05
+  max_docs: 2
+
+llm:
+  temperature: 0.2

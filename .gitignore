@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+env/
+venv/
+eval_env/
+
+# Data
+data/
+*.faiss
+*.pkl
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+*.Zone.Identifier
