@@ -16,7 +16,19 @@ data/
 logs/
 *.log
 
+# Models
+models/
+*.bin
+*.pt
+*.gguf
+
+# Evaluation outputs
+evaluation/results.csv
+
 # OS files
 .DS_Store
 Thumbs.db
 *.Zone.Identifier
+
+# Notebooks
+.ipynb_checkpoints/
