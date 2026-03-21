@@ -223,5 +223,5 @@ Attention is a mechanism that allows models to focus on important parts of the i
 
 ## 👨‍💻 Author
 
-San  
+Santhosh Gaddam  
 AI/ML Engineer | Building Production-Ready RAG & LLM Systems
