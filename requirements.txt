@@ -1,14 +1,33 @@
+# API
 fastapi
 uvicorn
+
+# LLM / LangChain
 langchain
 langgraph
+langchain-huggingface
+langchain-ollama
+
+# Retrieval
 sentence-transformers
 faiss-cpu
 rank-bm25
+
+# Evaluation
 ragas
+
+# App / UI
 streamlit
+
+# Data
 pandas
 numpy
 scikit-learn
+
+# Utils
 pyyaml
+requests
+tqdm
+
+# LLM runtime
 ollama
