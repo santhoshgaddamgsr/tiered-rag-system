@@ -1,4 +1,5 @@
 from typing import TypedDict
+import time
 
 from langgraph.graph import StateGraph
 
@@ -27,6 +28,7 @@ class GraphState(TypedDict, total=False):
     distances: list
     reranker_scores: list
     retrieved_chunks: list
+    llm_used: bool
 
 
 # -------------------------
@@ -62,7 +64,8 @@ def cache_check(state):
         return {
             "answer": cached["answer"],
             "sources": cached["sources"],
-            "route": "cache"
+            "route": "cache",
+            "llm_used": False
         }
 
     return {
@@ -89,7 +92,7 @@ def rewrite(state):
 
 
 # -------------------------
-# ROUTER NODE
+# ROUTER NODE (FIXED)
 # -------------------------
 
 def router(state):
@@ -98,13 +101,20 @@ def router(state):
 
     distances, avg_distance = similarity_topk(query)
 
-    if avg_distance > THRESHOLD:
+    if distances:
+        top_k = min(3, len(distances))
+        top_scores = sorted(distances)[:top_k]
+        score = sum(top_scores) / len(top_scores)
+    else:
+        score = avg_distance
+
+    if score > THRESHOLD:
 
         return {
             "question": state["question"],
             "rewritten_query": query,
             "route": "llm",
-            "avg_distance": avg_distance,
+            "avg_distance": score,
             "distances": distances
         }
 
@@ -112,7 +122,7 @@ def router(state):
         "question": state["question"],
         "rewritten_query": query,
         "route": "rag",
-        "avg_distance": avg_distance,
+        "avg_distance": score,
         "distances": distances
     }
 
@@ -123,6 +133,8 @@ def router(state):
 
 def retrieve(state):
 
+    start_time = time.time()
+
     rewritten_query = state["rewritten_query"]
 
     queries = decompose_query(rewritten_query)
@@ -132,17 +144,11 @@ def retrieve(state):
 
     num_queries = len(queries)
 
-    # -------------------------
-    # ADAPTIVE RETRIEVAL (FIXED)
-    # -------------------------
-
     if num_queries == 1:
-        # Single query → original behavior
         vector_docs = vector_retriever.invoke(queries[0])[:30]
         bm25_docs = bm25.invoke(queries[0])[:10]
 
     else:
-        # Multi-query → balanced retrieval
         vector_k = max(1, 30 // num_queries)
         bm25_k = max(1, 10 // num_queries)
 
@@ -150,10 +156,7 @@ def retrieve(state):
             vector_docs.extend(vector_retriever.invoke(q)[:vector_k])
             bm25_docs.extend(bm25.invoke(q)[:bm25_k])
 
-    # -------------------------
-    # RECIPROCAL RANK FUSION
-    # -------------------------
-
+    # RRF
     rrf_scores = {}
     k = 60
 
@@ -183,10 +186,7 @@ def retrieve(state):
 
     unique_docs = [item["doc"] for item in fused_docs]
 
-    # -------------------------
     # RERANKER
-    # -------------------------
-
     pairs = [
         (rewritten_query, doc.page_content)
         for doc in unique_docs[:80]
@@ -201,10 +201,7 @@ def retrieve(state):
         reverse=True
     )
 
-    # -------------------------
     # DYNAMIC FILTERING
-    # -------------------------
-
     if scored_docs:
         max_score = scored_docs[0][1]
     else:
@@ -225,18 +222,10 @@ def retrieve(state):
         top_docs = [doc for doc, _ in filtered][:max_docs]
         top_scores = [float(score) for _, score in filtered][:max_docs]
 
-    # -------------------------
-    # DEBUG
-    # -------------------------
-
     print("\n--- RERANK DEBUG ---")
     print("Top scores:", [round(s, 4) for _, s in scored_docs[:10]])
     print("Threshold:", round(threshold, 4))
     print("Filtered count:", len(filtered))
-
-    # -------------------------
-    # BUILD CONTEXT
-    # -------------------------
 
     if top_docs:
         context = "\n\n".join(
@@ -244,10 +233,6 @@ def retrieve(state):
         )
     else:
         context = ""
-
-    # -------------------------
-    # SOURCES
-    # -------------------------
 
     sources = []
     seen_sources = set()
@@ -268,10 +253,6 @@ def retrieve(state):
 
             seen_sources.add(key)
 
-    # -------------------------
-    # DEBUG CHUNKS
-    # -------------------------
-
     retrieved_chunks = []
 
     for doc, score in zip(top_docs, top_scores):
@@ -283,22 +264,19 @@ def retrieve(state):
             "page": doc.metadata.get("page", "unknown")
         })
 
-    # -------------------------
-    # LOGGING
-    # -------------------------
-
     log_event({
         "query": state["question"],
         "rewritten_query": rewritten_query,
         "route": "rag",
-        "num_queries": num_queries,  # ✅ NEW (very useful)
+        "num_queries": num_queries,
         "num_retrieved": len(scored_docs),
         "num_filtered": len(filtered),
         "top_scores": [round(float(s), 4) for _, s in scored_docs[:5]],
         "avg_score": round(
             sum(float(s) for _, s in scored_docs[:5]) / min(5, len(scored_docs)), 4
         ) if scored_docs else 0,
-        "final_docs": len(top_docs)
+        "final_docs": len(top_docs),
+        "latency": round(time.time() - start_time, 3)
     })
 
     return {
@@ -310,8 +288,35 @@ def retrieve(state):
         "retrieved_chunks": retrieved_chunks
     }
 
+
 # -------------------------
-# GENERATE NODE
+# CONFIDENCE FUNCTION (NEW)
+# -------------------------
+
+def compute_confidence(rerank_scores):
+
+    if not rerank_scores:
+        return 0.0
+
+    top_score = rerank_scores[0]
+
+    top_k = min(3, len(rerank_scores))
+    avg_top3 = sum(rerank_scores[:top_k]) / top_k
+
+    num_good = len([s for s in rerank_scores if s > 0.7])
+    max_docs = max(1, len(rerank_scores))
+
+    confidence = (
+        0.5 * top_score +
+        0.3 * avg_top3 +
+        0.2 * (num_good / max_docs)
+    )
+
+    return round(confidence, 4)
+
+
+# -------------------------
+# GENERATE NODE (UPDATED)
 # -------------------------
 
 def generate(state):
@@ -320,16 +325,43 @@ def generate(state):
     rewritten_query = state.get("rewritten_query", query)
     context = state.get("context", "")
 
-    if context:
+    rerank_scores = state.get("reranker_scores", [])
+    retrieved_chunks = state.get("retrieved_chunks", [])
+
+    confidence = compute_confidence(rerank_scores)
+
+    if context and confidence >= 0.75:
+
+        if retrieved_chunks:
+            top_chunk = retrieved_chunks[0]["text"].strip()
+            answer = " ".join(top_chunk.split())[:500]
+
+            if "." in answer:
+                answer = answer[:answer.rfind(".")+1]
+        else:
+            answer = ""
+
+        mode = "SKIPPED_LLM"
+        llm_used = False
+
+    elif context and confidence >= 0.4:
+
         formatted_prompt = prompt.format(
             context=context,
             question=rewritten_query
         )
+
         answer = llm.invoke(formatted_prompt)
+
         mode = "RAG"
+        llm_used = True
+
     else:
-        answer = llm.invoke(query)   # ✅ fallback
+
+        answer = llm.invoke(query)
+
         mode = "LLM_FALLBACK"
+        llm_used = True
 
     sources = state.get("sources", [])
 
@@ -341,14 +373,24 @@ def generate(state):
     log_event({
         "query": query,
         "mode": mode,
+        "confidence": confidence,
+        "llm_used": llm_used,
         "used_context": bool(context),
+        "num_chunks": len(rerank_scores),
         "context_length": len(context),
-        "answer_length": len(answer) 
+        "answer_length": len(answer)
     })
+    print("\n--- DECISION DEBUG ---")
+    print("Confidence:", confidence)
+    print("Mode:", mode)
+    print("LLM Used:", llm_used)
+    print("Top Scores:", rerank_scores[:3])
 
     return {
         "answer": answer,
-        "sources": sources
+        "sources": sources,
+        "llm_used": llm_used,
+        "confidence": confidence
     }
 
 
@@ -366,7 +408,6 @@ builder.add_node("generate", generate)
 
 builder.set_entry_point("cache_check")
 
-
 builder.add_conditional_edges(
     "cache_check",
     lambda x: x["route"],
@@ -376,7 +417,6 @@ builder.add_conditional_edges(
     }
 )
 
-
 builder.add_conditional_edges(
     "rewrite",
     lambda x: x["route"],
@@ -384,7 +424,6 @@ builder.add_conditional_edges(
         "router": "router"
     }
 )
-
 
 builder.add_conditional_edges(
     "router",
@@ -394,7 +433,6 @@ builder.add_conditional_edges(
         "llm": "generate"
     }
 )
-
 
 builder.add_edge("retrieve", "generate")
 
