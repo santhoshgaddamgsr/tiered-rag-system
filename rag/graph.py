@@ -313,8 +313,23 @@ def compute_confidence(rerank_scores):
     )
 
     return round(confidence, 4)
+#--------------------
+# Query type detector
+#--------------------
+def is_reasoning_query(query: str) -> bool:
+    q = query.lower().strip()
 
+    # strong signals
+    if q.startswith(("why", "how")):
+        return True
 
+    # reasoning patterns
+    keywords = [
+        "compare", "difference", "explain",
+        "reason", "impact", "advantages", "disadvantages"
+    ]
+
+    return any(k in q for k in keywords)
 # -------------------------
 # GENERATE NODE (UPDATED)
 # -------------------------
@@ -330,7 +345,9 @@ def generate(state):
 
     confidence = compute_confidence(rerank_scores)
 
-    if context and confidence >= 0.75:
+    is_reasoning = is_reasoning_query(query)
+
+    if context and confidence >= 0.75 and not is_reasoning:
 
         if retrieved_chunks:
             top_chunk = retrieved_chunks[0]["text"].strip()
