@@ -27,5 +27,7 @@ def query(request: QueryRequest):
         "retrieved_chunks": result.get("retrieved_chunks"),
         "route": result.get("route"),
         "avg_distance": result.get("avg_distance"),
-        "top_k_distances": result.get("distances")
+        "top_k_distances": result.get("distances"),
+        "confidence": result.get("confidence"),
+        "llm_used": result.get("llm_used")
     }

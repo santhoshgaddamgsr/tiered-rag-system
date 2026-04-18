@@ -29,6 +29,7 @@ class GraphState(TypedDict, total=False):
     reranker_scores: list
     retrieved_chunks: list
     llm_used: bool
+    confidence: float 
 
 
 # -------------------------
@@ -404,6 +405,8 @@ def generate(state):
     print("Top Scores:", rerank_scores[:3])
 
     return {
+        **state,
+
         "answer": answer,
         "sources": sources,
         "llm_used": llm_used,
