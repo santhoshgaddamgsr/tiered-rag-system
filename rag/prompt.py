@@ -1,25 +1,28 @@
 from langchain_core.prompts import PromptTemplate
 
-
 prompt = PromptTemplate(
-    template="""
-You are an AI assistant answering questions using retrieved documents.
+    template="""<|im_start|>system
+You are a factual assistant.
 
-IMPORTANT RULES:
-- Answer ONLY using the information provided in the context.
-- Do NOT use outside knowledge.
-- If the answer is not clearly present in the context, respond exactly with:
-  "I don't know based on the provided documents."
-- Be concise and accurate.
-- If possible, summarize the relevant information from the context.
+STRICT RULES:
+- Answer ONLY using the provided context
+- Do NOT use outside knowledge
+- Extract only information that is DIRECTLY relevant to the question
+- Ignore any unrelated or less relevant details
+- MUST cover ALL parts of the question
+- If question has multiple parts, answer each part separately
+- Be concise and precise<|im_end|>
 
+<|im_start|>user
 Context:
 {context}
 
 Question:
 {question}
 
-Answer:
+Answer (only relevant points, no extra information):<|im_end|>
+
+<|im_start|>assistant
 """,
     input_variables=["context", "question"]
 )
