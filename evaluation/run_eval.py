@@ -34,7 +34,12 @@ def query_rag(question):
 
     contexts = []
 
-    if result.get("retrieved_chunks"):
+    # ✅ FIX: use reranker-filtered chunks (actual context used)
+    if result.get("reranker_filtered_chunks"):
+        contexts = result["reranker_filtered_chunks"]
+
+    # 🔁 fallback
+    elif result.get("retrieved_chunks"):
         contexts = [c["text"] for c in result["retrieved_chunks"]]
 
     return result["answer"], contexts, result.get("retrieved_chunks", [])
@@ -108,6 +113,7 @@ def main():
     print("==============================\n")
 
     print(results)
+
     # -------------------------
     # SAVE RESULTS FOR DASHBOARD
     # -------------------------
@@ -119,7 +125,6 @@ def main():
         "ground_truth": df["ground_truth"],
         "retrieved_chunks": all_chunks,
         
-        # same overall metrics (temporary)
         "faithfulness": results["faithfulness"],
         "answer_relevancy": results["answer_relevancy"],
         "context_precision": results["context_precision"],

@@ -4,7 +4,7 @@ import numpy as np
 
 class SimpleCache:
 
-    def __init__(self, max_size=50, similarity_threshold=0.90):
+    def __init__(self, max_size=50, similarity_threshold=0.87):
 
         self.cache = {}
         self.order = []
@@ -47,9 +47,13 @@ class SimpleCache:
                 best_score = score
                 best_match = cached_query
 
+        print(f"SEMANTIC CACHE BEST SCORE: {round(best_score, 4)} | THRESHOLD: {self.similarity_threshold}")
+
         if best_score >= self.similarity_threshold:
+            print(f"SEMANTIC CACHE HIT: '{best_match}'")
             return self.cache.get(best_match)
 
+        print("SEMANTIC CACHE MISS")
         return None
 
     # -------------------------
